@@ -1,0 +1,23 @@
+## once you've gone through processing your fastq files, this is my next step in calling variants in your population
+## you will need BCFtools, SAMtools, gatk, and all their dependencies
+
+cd PATH/TO/FILES
+
+## you will need to create a file that is a list of all the individuals you want variant calling performed on. For simplicity, I am going to assume that all the files in your cd that end in "s.bam" are what we want, because that's what we ended with in the last code file.
+ls *s.bam > bam.list
+  
+## variant calling
+bcftools mpileup -b bam.list -f ./PATH/TO/GENOME.fa -q 30 -Q 20 --max-BQ 40 -O z -I -a AD,DP,SP | \
+bcftools call -O z -v -m -f GQ,GP -o NAMEFILE.vcf.gz
+  ## index the .vcf we just made (.tbi)
+bcftools index -t NAMEFILE.vcf.gz
+
+## the following steps are if you only care about variants that are present in some known parents that you included in your variant calling
+  ## first, we will pull out just the parents
+bcftools view -s PARENTONEs.bam,PARENTTWOs.bam -o par.vcf.gz -O z NAMEFILE.vcf.gz
+## index the .vcf we just made of only the parents
+bcftools index -t par.vcf.gz
+
+## then gatk will filter the rest of the population to only variants present in the parents' file
+gatk CalculateGenotypePosteriors -V F1Hap2.vcf.gz -supporting par.vcf.gz -O F1Hap2.par.vcf.gz
+  ## gatk automatically makes an index file
