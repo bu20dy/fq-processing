@@ -7,6 +7,11 @@
 # this is the procedure I used to process WGS data for the purpose of down-stream variant calling
 # anything in CAPS needs to be changed, there may be some other spots as well
 
+cd ./PATH/TO/GENOME
+
+## this will create an indexed genome file using Hisat2 and each file will start with "Hisatindex." If you change that name, you will need to do so later as well when the code calls for the indexed genome
+./PATH/TO/HISAT2/hisat2-build -f REFERENCEGENOME.fa Hisatindex
+
 cd ./PATH/TO/DATA
 
 ## adapter and quality trimming using bbduk
