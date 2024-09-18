@@ -1,0 +1,45 @@
+# you need to have bbduk, Hisat2, SAMtools, and all necessary dependencies for this process.
+  # bbmap download at https://jgi.doe.gov/data-and-tools/software-tools/bbtools/bb-tools-user-guide/installation-guide/
+  # Hisat2 download at https://daehwankimlab.github.io/hisat2/download/#binaries
+  # SAMtools download at https://www.htslib.org/download/
+    # note I will not maintain the above links, if they become inaccurate. Google is free!
+
+# this is the procedure I used to process WGS data for the purpose of down-stream variant calling
+# anything in CAPS needs to be changed, there may be some other spots as well
+
+cd ./PATH/TO/DATA
+
+## adapter and quality trimming using bbduk
+  ## "for every i that ends in _R1.fq.gz, perform this process"
+  ## this removes common sequence adapters and trims both ends of reads, as necessary due to drops in quality
+  ## this works for paired and unpaired read data, so long as the pairs start the same and end with eith "_R1" or "_R2" which is common. Change as needed. 
+for i in `ls -1 *_R1.fq.gz | sed 's/_R1.fq.gz//'`
+do
+./PATH/TO/BBMAP/bbduk.sh t=30 in1=$i\_R1.fq.gz in2=$i\_R2.fq.gz out1=$i\_R1_T.fq.gz out2=$i\_R2_T.fq.gz ref=./PATH/TO/BBMAP/resources/adapters.fa ktrim=r mink=11 k=23 hdist=1 tpe tbo qtrim=rl trimq=20
+Done
+
+## align forward and reverse quality trimmed fastqs into a SAM file
+  ## this is specifically for paired read data
+for i in `ls -1 *_R1_T.fq.gz | sed 's/_R1_T.fq.gz//'`
+do
+./PATH/TO/HISAT2/hisat2 -q -p 60 -x ./PATH/TO/INDEXED/GENOME/Hisatindex -1 $i\_R1_T.fq.gz -2 $i\_R2_T.fq.gz -S $i\.sam --n-ceil L,0,0.8
+done
+
+## sam to binary format
+  ## many downstream processes prefer to work with .bam files since they are smaller
+for i in `ls -1 *.sam | sed 's/.sam//'`
+do
+samtools view -bS $i\.sam > $i\.bam
+done
+
+## sorted BAM files 
+for i in `ls -1 *.sam | sed 's/.sam//'`
+do
+samtools sort $i\.bam -o $i\s.bam
+done
+
+## create bai files for new sorted files
+for i in `ls -1 *s.bam | sed 's/.bam//'`
+do
+samtools index $i\.bam
+done
