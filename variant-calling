@@ -6,18 +6,23 @@ cd PATH/TO/FILES
 ## you will need to create a file that is a list of all the individuals you want variant calling performed on. For simplicity, I am going to assume that all the files in your cd that end in "s.bam" are what we want, because that's what we ended with in the last code file.
 ls *s.bam > bam.list
   
-## variant calling
+## what do these parameters mean???
+    # -q 30 = sets the minimum mapping quality allowed for a read to be included in the pileup (ranges from 0-60, Phred-scaled). 30 indicates a 99.9% confidence that the read was correctly aligned to the genome. I have it set this high since I want to avoid multi-mapping.
+    # -Q 20 = sets the minimum base quality allowed for a read to be included in the pileup (ranges from 0-40, Phred-scaled). Represents the probablity of a base having been sequenced incorrectly. 20 indicates a 99% confidence that the base call is correct.
+    # --max-BQ 40 = sets the maximum base quality allowed. Since the scale should range from 0-40, this just ensures no bases are incorrectly inflated for whatever reason.
+    # -m = allows for multiallelic calling (i.e. not just biallelic)
+## site information
+    # AD = allelic depth = number of reads present for each allele. Typically comma-separated. E.g AD=10,5 where the reference has 10 reads and the alternate has 5.
+    # DP = depth of coverage = total number of reads covering that site (basically AD for all alleles, summed).
+    # SP = Strand Bias P-value = indicates whether there is strand bias for a certain allele. E.g. if a site has a low strand bias p-value, there is strong evidence that the allele is a systematic/sequencing error rather than a true variant.
+    # GQ = genotype quality = confidence in the assigned genotype for that individual at that site (ranges from 0-99, Phred-scaled). 
+    # GP = genotype posterior probability = the likelihood for all the genotypes at that site for that individual. Typically comma-separated. E.g. GP=0.9,0.1,0.0 where there is a 0.9 probability the individual is homozygous for the reference allele. 
+
+##variant calling
 bcftools mpileup -b bam.list -f ./PATH/TO/GENOME.fa -q 30 -Q 20 --max-BQ 40 -O z -I -a AD,DP,SP | \
-bcftools call -O z -v -m -f GQ,GP -o NAMEFILE.vcf.gz
-  ## index the .vcf we just made (.tbi)
-bcftools index -t NAMEFILE.vcf.gz
+bcftools call -O z -v -m -f GQ,GP -o VCF.vcf.gz
 
-## the following steps are if you only care about variants that are present in some known parents that you included in your variant calling
-  ## first, we will pull out just the parents
-bcftools view -s PARENTONEs.bam,PARENTTWOs.bam -o par.vcf.gz -O z NAMEFILE.vcf.gz
-## index the .vcf we just made of only the parents
-bcftools index -t par.vcf.gz
+##variant filtering
+bcftools view -i 'DP > 10 & DP < 100 & GQ > 20 & QUAL > 30 & F_MISSING < 0.90' VCF.vcf.gz -o filtered_VCF.vcf.gz
 
-## then gatk will filter the rest of the population to only variants present in the parents' file
-gatk CalculateGenotypePosteriors -V F1Hap2.vcf.gz -supporting par.vcf.gz -O F1Hap2.par.vcf.gz
-  ## gatk automatically makes an index file
+bcftools index -t filtered_VCF.vcf.gz
